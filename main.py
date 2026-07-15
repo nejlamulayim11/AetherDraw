@@ -3,6 +3,8 @@ import cv2
 from app.camera import Camera
 from app.hand_tracker import HandTracker
 from app.drawing_engine import DrawingEngine
+from app.gesture_engine import GestureEngine
+from app.smoother import PointSmoother
 from app.utils import FPSCounter
 from app.config import WINDOW_NAME
 
@@ -12,6 +14,8 @@ def main():
     camera = Camera()
     tracker = HandTracker()
     drawing = DrawingEngine()
+    gesture_engine = GestureEngine()
+    smoother = PointSmoother()
     fps_counter = FPSCounter()
 
     while True:
@@ -19,50 +23,92 @@ def main():
         frame = camera.read()
 
         if frame is None:
-            print("Failed to capture frame.")
             break
 
-        # Hand Detection
+        drawing.initialize(frame)
+
         results = tracker.process(frame)
 
-        # Draw Hand Skeleton
         frame = tracker.draw_landmarks(frame, results)
 
-        # Get Landmarks
-        landmarks = tracker.get_landmarks(frame, results)
+        hand = tracker.get_hand(frame, results)
 
-        if landmarks:
+        gesture = gesture_engine.detect(hand)
 
-            _, x, y = landmarks[8]
+        if hand:
 
-            # Draw on canvas
-            drawing.draw((x, y))
+            smooth_point = smoother.smooth(hand.index_tip)
 
-            # Show fingertip
+            # İşaret parmağı ucu
             cv2.circle(
                 frame,
-                (x, y),
+                smooth_point,
                 10,
                 (0, 0, 255),
                 -1
             )
 
-            # Coordinates
+            # Gesture rengi
+            if gesture == GestureEngine.DRAW:
+                gesture_color = (0, 255, 0)
+
+            elif gesture == GestureEngine.ERASE:
+                gesture_color = (0, 0, 255)
+
+            else:
+                gesture_color = (255, 255, 255)
+
+            # Gesture bilgisi
             cv2.putText(
                 frame,
-                f"Index Finger : ({x}, {y})",
+                f"Gesture : {gesture}",
                 (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.8,
-                (0, 255, 0),
+                gesture_color,
                 2
             )
 
+            # Parmağın koordinatı
+            cv2.putText(
+                frame,
+                f"Point : {smooth_point}",
+                (20, 75),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (255, 255, 0),
+                2
+            )
+
+            # Çizim
+            if gesture == GestureEngine.DRAW:
+
+                drawing.draw(smooth_point)
+
+            elif gesture == GestureEngine.ERASE:
+
+                drawing.erase(smooth_point)
+
+            else:
+
+                drawing.draw(None)
+
         else:
 
+            smoother.smooth(None)
             drawing.draw(None)
 
-        # Merge drawing canvas with camera image
+            cv2.putText(
+                frame,
+                "Gesture : IDLE",
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                (255, 255, 255),
+                2
+            )
+
+        # Çizim katmanını kameraya ekle
         frame = drawing.merge(frame)
 
         # FPS
@@ -71,10 +117,41 @@ def main():
         cv2.putText(
             frame,
             f"FPS : {fps}",
-            (20, 80),
+            (20, 110),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.8,
+            0.7,
             (255, 0, 0),
+            2
+        )
+
+        # Yardım metni
+        cv2.putText(
+            frame,
+            "Draw  : Index Finger",
+            (20, 145),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 0),
+            2
+        )
+
+        cv2.putText(
+            frame,
+            "Erase : Index + Middle",
+            (20, 170),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 0, 255),
+            2
+        )
+
+        cv2.putText(
+            frame,
+            "C : Clear    Q : Quit",
+            (20, 195),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (255, 255, 255),
             2
         )
 

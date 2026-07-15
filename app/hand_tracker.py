@@ -7,10 +7,13 @@ from app.config import (
     MIN_TRACKING_CONFIDENCE
 )
 
+from app.models import HandData, FingerState
+
 
 class HandTracker:
 
     def __init__(self):
+
         self.mp_hands = mp.solutions.hands
         self.mp_draw = mp.solutions.drawing_utils
 
@@ -22,15 +25,17 @@ class HandTracker:
         )
 
     def process(self, frame):
+
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.hands.process(rgb)
-        return results
+        return self.hands.process(rgb)
 
     def draw_landmarks(self, frame, results):
+
         if not results.multi_hand_landmarks:
             return frame
 
         for hand in results.multi_hand_landmarks:
+
             self.mp_draw.draw_landmarks(
                 frame,
                 hand,
@@ -39,26 +44,62 @@ class HandTracker:
 
         return frame
 
-    def get_landmarks(self, frame, results):
-        """
-        Returns:
-            [(id, x, y), ...]
-        """
+    def _finger_states(self, landmarks):
 
-        landmark_list = []
+        fingers = FingerState()
+
+        fingers.thumb = landmarks[4][1] > landmarks[3][1]
+        fingers.index = landmarks[8][2] < landmarks[6][2]
+        fingers.middle = landmarks[12][2] < landmarks[10][2]
+        fingers.ring = landmarks[16][2] < landmarks[14][2]
+        fingers.pinky = landmarks[20][2] < landmarks[18][2]
+
+        return fingers
+
+    def get_hand(self, frame, results):
 
         if not results.multi_hand_landmarks:
-            return landmark_list
+            return None
 
         h, w, _ = frame.shape
 
-        # Şimdilik sadece ilk eli kullanıyoruz
         hand = results.multi_hand_landmarks[0]
 
+        landmarks = []
+
         for idx, lm in enumerate(hand.landmark):
+
             x = int(lm.x * w)
             y = int(lm.y * h)
 
-            landmark_list.append((idx, x, y))
+            landmarks.append((idx, x, y))
 
-        return landmark_list
+        handedness = "Right"
+
+        if results.multi_handedness:
+            handedness = results.multi_handedness[0].classification[0].label
+
+        fingers = self._finger_states(landmarks)
+
+        return HandData(
+
+            landmarks=landmarks,
+
+            wrist=(landmarks[0][1], landmarks[0][2]),
+
+            thumb_tip=(landmarks[4][1], landmarks[4][2]),
+
+            index_tip=(landmarks[8][1], landmarks[8][2]),
+
+            middle_tip=(landmarks[12][1], landmarks[12][2]),
+
+            ring_tip=(landmarks[16][1], landmarks[16][2]),
+
+            pinky_tip=(landmarks[20][1], landmarks[20][2]),
+
+            fingers=fingers,
+
+            is_left=(handedness == "Left"),
+
+            is_right=(handedness == "Right")
+        )
