@@ -1,20 +1,35 @@
-from collections import deque
-
-
 class PointSmoother:
 
-    def __init__(self, window_size=5):
-        self.points = deque(maxlen=window_size)
+    def __init__(self, smooth_factor=0.65):
+
+        self.previous = None
+        self.smooth_factor = smooth_factor
+
 
     def smooth(self, point):
 
         if point is None:
-            self.points.clear()
+            self.previous = None
             return None
 
-        self.points.append(point)
 
-        avg_x = sum(p[0] for p in self.points) // len(self.points)
-        avg_y = sum(p[1] for p in self.points) // len(self.points)
+        if self.previous is None:
 
-        return (avg_x, avg_y)
+            self.previous = point
+            return point
+
+
+        x = int(
+            self.previous[0] * self.smooth_factor +
+            point[0] * (1 - self.smooth_factor)
+        )
+
+        y = int(
+            self.previous[1] * self.smooth_factor +
+            point[1] * (1 - self.smooth_factor)
+        )
+
+
+        self.previous = (x, y)
+
+        return (x, y)

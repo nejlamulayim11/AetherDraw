@@ -24,6 +24,9 @@ class Camera:
         if not success:
             return None
 
+        # Kamerayı ayna görünümüne çevir
+        frame = cv2.flip(frame, 1)
+
         return frame
 
     def release(self):

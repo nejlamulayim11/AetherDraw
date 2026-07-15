@@ -15,7 +15,9 @@ def main():
     tracker = HandTracker()
     drawing = DrawingEngine()
     gesture_engine = GestureEngine()
-    smoother = PointSmoother()
+    smoother = PointSmoother(
+    smooth_factor=0.65
+)
     fps_counter = FPSCounter()
 
     while True:
